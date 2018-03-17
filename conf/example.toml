@@ -1,0 +1,13 @@
+[openapi]
+endpoint = "https://myhost"
+key = "mykey"
+secret = "mysecret"
+verify = false
+
+[kafka]
+topic = "mytopid"
+ssl = true
+rootca = "cert/KafkaCA.cert"
+cert = "cert/KafkaConsumerCA.cert"
+key = "cert/KafkaConsumerPrivateKey.key"
+brokers = ["1.1.1.1:9093"]
