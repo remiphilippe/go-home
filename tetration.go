@@ -9,6 +9,8 @@ import (
 	goh4 "github.com/remiphilippe/go-h4"
 )
 
+// This file is temporary, most of the structs will move to go-h4
+
 type Annotation struct {
 	IP         string            `json:"ip"`
 	Attributes map[string]string `json:"attributes"`
@@ -30,7 +32,7 @@ type Tetration struct {
 	h4 *goh4.H4
 }
 
-func TetrationFactory(config *Config) *Tetration {
+func NewTetration(config *Config) *Tetration {
 
 	h := new(Tetration)
 
@@ -45,16 +47,21 @@ func TetrationFactory(config *Config) *Tetration {
 }
 
 func (h *Tetration) getSensorIP(hostname string) []map[string]string {
+	// More info - https://<some tetration cluster>/documentation/ui/openapi/api_inventory.html#inventory-search
+	// first we need to build a filter
+	//
 	f0 := make(map[string]string)
 	f0["type"] = "contains"
 	f0["field"] = "hostname"
 	f0["value"] = hostname
 
+	// add our filter elements to a set of filters with an operation (and / or)
 	filter := &Filter{
 		Type:    "and",
 		Filters: []map[string]string{f0},
 	}
 
+	// Add our filter to the search query
 	search := Search{
 		Limit:  100,
 		Filter: filter,
@@ -124,10 +131,13 @@ func (h *Tetration) getSensorIP(hostname string) []map[string]string {
 	return res
 }
 
+// Isolate set an isolation tag on a VM, this tag needs to be attached to a policy
 func (h *Tetration) Isolate(ip string, scope string) error {
+	// Create a map of attributes to apply to a workload
 	attributes := make(map[string]string)
 	attributes["quarantine"] = "isolate"
 
+	// Define where we want to attach this annotation
 	annotation := Annotation{
 		IP:         ip,
 		Attributes: attributes,

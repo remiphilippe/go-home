@@ -81,6 +81,7 @@ func tagDecode(e interface{}, m map[string]interface{}) {
 	}
 }
 
+// UnmarshalJSON Custom JSON decoder to handle the nested elements and the escaping of Kafka.
 func (a *Alert) UnmarshalJSON(b []byte) error {
 	mapAlert := make(map[string]interface{})
 	err := json.Unmarshal(b, &mapAlert)
@@ -88,7 +89,7 @@ func (a *Alert) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	glog.V(2).Infoln("Decording Alert")
+	glog.V(2).Infoln("Decoding Alert")
 	tagDecode(a, mapAlert)
 
 	d := new(AlertDetail)
@@ -98,7 +99,7 @@ func (a *Alert) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	glog.V(2).Infoln("Decording Details")
+	glog.V(2).Infoln("Decoding Details")
 	tagDecode(d, mapDetail)
 
 	a.AlertDetail = d

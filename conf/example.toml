@@ -5,7 +5,7 @@ secret = "mysecret"
 verify = false
 
 [kafka]
-topic = "mytopid"
+topic = "mytopic"
 ssl = true
 rootca = "cert/KafkaCA.cert"
 cert = "cert/KafkaConsumerCA.cert"
