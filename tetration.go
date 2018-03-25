@@ -46,14 +46,13 @@ func NewTetration(config *Config) *Tetration {
 	return h
 }
 
-func (h *Tetration) getSensorIP(hostname string) []map[string]string {
+func (h *Tetration) getSensorIP(hostUUID string) []map[string]string {
 	// More info - https://<some tetration cluster>/documentation/ui/openapi/api_inventory.html#inventory-search
 	// first we need to build a filter
-	//
 	f0 := make(map[string]string)
 	f0["type"] = "contains"
-	f0["field"] = "hostname"
-	f0["value"] = hostname
+	f0["field"] = "host_uuid"
+	f0["value"] = hostUUID
 
 	// add our filter elements to a set of filters with an operation (and / or)
 	filter := &Filter{
@@ -122,6 +121,7 @@ func (h *Tetration) getSensorIP(hostname string) []map[string]string {
 
 	for _, v := range jsonResp["results"].([]interface{}) {
 		e := v.(map[string]interface{})
+		glog.V(2).Infof("Search found %s in scope %s for UUID %s\n", e["ip"].(string), e["vrf_name"].(string), hostUUID)
 		entry = make(map[string]string)
 		entry["scope"] = e["vrf_name"].(string)
 		entry["ip"] = e["ip"].(string)
@@ -146,6 +146,7 @@ func (h *Tetration) Isolate(ip string, scope string) error {
 	if err != nil {
 		log.Fatal(err)
 	}
+	glog.V(1).Infof("Isolating Host %s in scope %s\n", ip, scope)
 	h.h4.Post(fmt.Sprintf("/inventory/tags/%s", scope), fmt.Sprintf("%s", jsonStr))
 
 	return nil

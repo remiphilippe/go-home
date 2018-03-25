@@ -49,14 +49,14 @@ type Alert struct {
 func tagDecode(e interface{}, m map[string]interface{}) {
 	r := reflect.ValueOf(e).Elem()
 
-	glog.V(2).Infof("Total fields: %d", r.NumField())
+	glog.V(3).Infof("Total fields: %d", r.NumField())
 
 	for i := 0; i < r.NumField(); i++ {
 		valueField := r.Field(i)
 		typeField := r.Type().Field(i)
 		tag := string(typeField.Tag.Get("json"))
 
-		glog.V(2).Infof("Tag: %s Type: %s", tag, reflect.TypeOf(m[tag]))
+		glog.V(3).Infof("Tag: %s Type: %s", tag, reflect.TypeOf(m[tag]))
 
 		if tag != "" {
 			//value := valueField.Interface().(string)
@@ -65,13 +65,13 @@ func tagDecode(e interface{}, m map[string]interface{}) {
 			if m[tag] != nil {
 				switch m[tag].(type) {
 				case string:
-					glog.V(2).Infof("Tag %s Value %s \n", tag, m[tag].(string))
+					glog.V(3).Infof("Tag %s Value %s \n", tag, m[tag].(string))
 					valueField.SetString(m[tag].(string))
 				case int64:
-					glog.V(2).Infof("Tag %s Value %d \n", tag, m[tag].(int64))
+					glog.V(3).Infof("Tag %s Value %d \n", tag, m[tag].(int64))
 					valueField.SetInt(m[tag].(int64))
 				case float64:
-					glog.V(2).Infof("Tag %s Value %f \n", tag, m[tag].(float64))
+					glog.V(3).Infof("Tag %s Value %f \n", tag, m[tag].(float64))
 					valueField.SetFloat(m[tag].(float64))
 				}
 

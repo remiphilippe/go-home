@@ -71,3 +71,6 @@ dkms.conf
 
 conf/config.toml
 .DS_Store
+
+conf/cert*
+go-home

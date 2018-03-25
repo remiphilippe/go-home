@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"strings"
@@ -48,21 +49,21 @@ func (k *KafkaHandle) EnableSecureKafka(ClientCertificateFile string, ClientPriv
 	// Handle client cert and also client key
 	//TODO add support for password protected key?
 	if ClientCertificateFile != "" && ClientPrivateKeyFile != "" {
-		glog.V(2).Infof("Client Cert file: %s, Client Cert Key: %s\n", ClientCertificateFile, ClientPrivateKeyFile)
+		glog.V(1).Infof("Client Cert file: %s, Client Cert Key: %s\n", ClientCertificateFile, ClientPrivateKeyFile)
 		cert, err := tls.LoadX509KeyPair(ClientCertificateFile, ClientPrivateKeyFile)
 
 		if err != nil {
 			glog.Warningf("Error loading certificats: %s", err)
 			return err
 		}
-		glog.V(2).Infoln("Added root Cert in tls config")
+		glog.V(1).Infoln("Added root Cert in tls config")
 		k.kafkaConfig.Net.TLS.Config.Certificates = []tls.Certificate{cert}
 	}
 	tlsCertPool := x509.NewCertPool()
 
 	// CA file
 	if KafkaCAFile != "" {
-		glog.V(2).Infof("Kafka CA: %s\n", KafkaCAFile)
+		glog.V(1).Infof("Kafka CA: %s\n", KafkaCAFile)
 		kafkaCaCertFile, err := ioutil.ReadFile(KafkaCAFile)
 		if err != nil {
 			glog.Warningf("Failed to read kafka Certificate Authority file %s\n", err)
@@ -72,7 +73,7 @@ func (k *KafkaHandle) EnableSecureKafka(ClientCertificateFile string, ClientPriv
 			glog.Warningln("Failed to append certificates from Kafka Certificate Authority file")
 			return nil
 		}
-		glog.V(2).Infoln("Added root Cert in tls config")
+		glog.V(1).Infoln("Added root Cert in tls config")
 	}
 	k.kafkaConfig.Net.TLS.Config.RootCAs = tlsCertPool
 	return nil
@@ -115,7 +116,7 @@ func (k *KafkaHandle) Initialize(ClientCertificateFile string, ClientPrivateKeyF
 
 // consumerLoop get messages of Kafka
 func consumerLoop(cons sarama.Consumer, topic string, part int32, h *Tetration) {
-	glog.V(2).Infof("Consuming Topic %s Partition %d \n", topic, part)
+	glog.V(1).Infof("Consuming Topic %s Partition %d \n", topic, part)
 	partitionConsumer, err := cons.ConsumePartition(topic, part, sarama.OffsetOldest)
 	if err != nil {
 		glog.Fatal(err.Error())
@@ -136,19 +137,21 @@ func consumerLoop(cons sarama.Consumer, topic string, part int32, h *Tetration) 
 				spew.Dump(alert)
 				// Alert will return a sensor name and not IP, we need to get the IPs from inventory
 				// a host could have multiple IPs
-				ips := h.getSensorIP(alert.AlertDetail.Hostname)
+				ips := h.getSensorIP(alert.AlertDetail.SensorID)
 				for _, v := range ips {
 					// Isolate VMs by assigning tags to IP (quarantine=isolate)
 					h.Isolate(v["ip"], v["scope"])
 				}
 
-				glog.V(2).Infof("Consumed message offset %d on partition %d\n", msg.Offset, part)
+				glog.V(1).Infof("Consumed message offset %d on partition %d\n", msg.Offset, part)
 			}
 		}
 	}
 }
 
 func main() {
+	flag.Parse()
+	glog.Infoln("Starting go-home...")
 	config := NewConfig()
 	tetration := NewTetration(config)
 
@@ -160,12 +163,14 @@ func main() {
 
 	// KafkaCert / KafkaKey / KafkaRootCA and KafkaBroker are provided by Tetration
 	// for more info, see the README
+	glog.V(1).Infof("Initializing Kafka...")
 	err := kafkaHandle.Initialize(config.KafkaCert, config.KafkaKey, config.KafkaRootCA, config.KafkaBroker)
 	if err != nil {
 		glog.Errorf("Kafka Initialization failed: %s", err.Error())
 		return
 	}
 
+	glog.V(1).Infof("Getting Partitions...")
 	partitions, err := kafkaHandle.kafkaConsumer.Partitions(kafkaConfig.Topic)
 	if err != nil {
 		glog.Errorf("Getting Kafka partition failed: %s", err.Error())
