@@ -115,7 +115,7 @@ func (k *KafkaHandle) Initialize(ClientCertificateFile string, ClientPrivateKeyF
 }
 
 // consumerLoop get messages of Kafka
-func consumerLoop(cons sarama.Consumer, topic string, part int32, h *Tetration) {
+func consumerLoop(cons sarama.Consumer, topic string, part int32, h *Tetration, t *Twilio) {
 	glog.V(1).Infof("Consuming Topic %s Partition %d \n", topic, part)
 	partitionConsumer, err := cons.ConsumePartition(topic, part, sarama.OffsetOldest)
 	if err != nil {
@@ -135,12 +135,27 @@ func consumerLoop(cons sarama.Consumer, topic string, part int32, h *Tetration) 
 			if strings.Contains(alert.KeyID, "SIDE_CHANNEL") {
 				// Dump the alert to show progress
 				spew.Dump(alert)
-				// Alert will return a sensor name and not IP, we need to get the IPs from inventory
-				// a host could have multiple IPs
-				ips := h.getSensorIP(alert.AlertDetail.SensorID)
-				for _, v := range ips {
-					// Isolate VMs by assigning tags to IP (quarantine=isolate)
-					h.Isolate(v["ip"], v["scope"])
+
+				// If Tetration is defined, we shall Isolate
+				if h != nil {
+					glog.V(2).Infof("Tetration is enabled, isolation started\n")
+					// Alert will return a sensor name and not IP, we need to get the IPs from inventory
+					// a host could have multiple IPs
+					ips := h.getSensorIP(alert.AlertDetail.SensorID)
+					for _, v := range ips {
+						// Isolate VMs by assigning tags to IP (quarantine=isolate)
+						h.Isolate(v["ip"], v["scope"])
+					}
+				} else {
+					glog.V(2).Infof("Tetration is not enabled, no isolation\n")
+				}
+
+				// If Twilio is defined, we shall SMS
+				if t != nil {
+					glog.V(2).Infof("Twilio is enabled, SMS\n")
+					t.SendSMS(t.To, alert.AlertText)
+				} else {
+					glog.V(2).Infof("Twilio is not enabled, no SMS\n")
 				}
 
 				glog.V(1).Infof("Consumed message offset %d on partition %d\n", msg.Offset, part)
@@ -153,13 +168,24 @@ func main() {
 	flag.Parse()
 	glog.Infoln("Starting go-home...")
 	config := NewConfig()
-	tetration := NewTetration(config)
 
 	kafkaConfig := new(KafkaConfig)
 	// Topic is provided in the topics.txt file
 	kafkaConfig.Topic = config.KafkaTopic
 	kafkaConfig.SecureKafkaEnable = config.KafkaSSL
 	kafkaHandle := NewKafkaHandle(kafkaConfig)
+
+	var tetration *Tetration
+	if config.APIEnabled {
+		tetration = NewTetration(config)
+	}
+
+	var twilio *Twilio
+	if config.TwilioEnabled {
+		twilio = NewTwilio(config.TwilioToken, config.TwilioSID, config.TwilioFrom)
+		// We set the To based on the configuration file, but we could also input it directly here (or get it from somewhere)
+		twilio.To = config.TwilioTo
+	}
 
 	// KafkaCert / KafkaKey / KafkaRootCA and KafkaBroker are provided by Tetration
 	// for more info, see the README
@@ -187,7 +213,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		go consumerLoop(cons, kafkaConfig.Topic, part, tetration)
+		go consumerLoop(cons, kafkaConfig.Topic, part, tetration, twilio)
 	}
 
 	// This is for a demo, so keep the program running until some hits enter

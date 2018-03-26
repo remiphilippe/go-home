@@ -3,6 +3,7 @@ endpoint = "https://myhost"
 key = "mykey"
 secret = "mysecret"
 verify = false
+enabled = false
 
 [kafka]
 topic = "mytopic"
@@ -11,3 +12,9 @@ rootca = "cert/KafkaCA.cert"
 cert = "cert/KafkaConsumerCA.cert"
 key = "cert/KafkaConsumerPrivateKey.key"
 brokers = ["1.1.1.1:9093"]
+
+[twilio]
+enabled = false
+token = ""
+sid = ""
+to = ""

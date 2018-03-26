@@ -7,6 +7,7 @@ import (
 
 // Config go-hone configuration structure
 type Config struct {
+	APIEnabled  bool
 	APISecret   string
 	APIKey      string
 	APIEndpoint string
@@ -18,6 +19,12 @@ type Config struct {
 	KafkaKey    string
 	KafkaTopic  string
 	KafkaSSL    bool
+
+	TwilioEnabled bool
+	TwilioSID     string
+	TwilioToken   string
+	TwilioFrom    string
+	TwilioTo      string
 }
 
 // NewConfig Creates a new configuration struct, return a *Config
@@ -49,6 +56,7 @@ func (c *Config) loadConfig() {
 	c.APIKey = o.GetString("key")
 	c.APIEndpoint = o.GetString("endpoint")
 	c.APIVerify = o.GetBool("verify")
+	c.APIEnabled = o.GetBool("enabled")
 
 	glog.V(2).Infof("Loading Kafka Config...")
 	k := viper.Sub("kafka")
@@ -59,4 +67,11 @@ func (c *Config) loadConfig() {
 	c.KafkaTopic = k.GetString("topic")
 	c.KafkaSSL = k.GetBool("ssl")
 
+	glog.V(2).Infof("Loading Twilio Config...")
+	t := viper.Sub("twilio")
+	c.TwilioEnabled = t.GetBool("enabled")
+	c.TwilioToken = t.GetString("token")
+	c.TwilioSID = t.GetString("sid")
+	c.TwilioFrom = t.GetString("from")
+	c.TwilioTo = t.GetString("to")
 }
