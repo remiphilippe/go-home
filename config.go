@@ -25,6 +25,7 @@ type Config struct {
 	TwilioToken   string
 	TwilioFrom    string
 	TwilioTo      string
+	TwilioLimit   int
 }
 
 // NewConfig Creates a new configuration struct, return a *Config
@@ -40,7 +41,7 @@ func NewConfig() *Config {
 	err := viper.ReadInConfig()
 	if err != nil {
 		// Handle errors reading the config file
-		glog.Fatal("Fatal error config file: %s \n")
+		glog.Fatalf("Fatal error config file: %s", err.Error())
 	}
 
 	c.loadConfig()
@@ -74,4 +75,5 @@ func (c *Config) loadConfig() {
 	c.TwilioSID = t.GetString("sid")
 	c.TwilioFrom = t.GetString("from")
 	c.TwilioTo = t.GetString("to")
+	c.TwilioLimit = t.GetInt("limit")
 }

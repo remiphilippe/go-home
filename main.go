@@ -153,7 +153,8 @@ func consumerLoop(cons sarama.Consumer, topic string, part int32, h *Tetration, 
 				// If Twilio is defined, we shall SMS
 				if t != nil {
 					glog.V(2).Infof("Twilio is enabled, SMS\n")
-					t.SendSMS(t.To, alert.AlertText)
+					//t.SendSMS(t.To, alert.AlertText)
+					t.Message <- &Message{To: t.To, Text: alert.AlertText}
 				} else {
 					glog.V(2).Infof("Twilio is not enabled, no SMS\n")
 				}
@@ -182,7 +183,7 @@ func main() {
 
 	var twilio *Twilio
 	if config.TwilioEnabled {
-		twilio = NewTwilio(config.TwilioToken, config.TwilioSID, config.TwilioFrom)
+		twilio = NewTwilio(config.TwilioToken, config.TwilioSID, config.TwilioFrom, config.TwilioLimit)
 		// We set the To based on the configuration file, but we could also input it directly here (or get it from somewhere)
 		twilio.To = config.TwilioTo
 	}

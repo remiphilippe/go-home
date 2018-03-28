@@ -75,7 +75,10 @@ There parameters are self explanatory.
 endpoint = "https://myhost"
 key = "mykey"
 secret = "mysecret"
+# Shall we check the certificate
 verify = false
+# Do we want to isolate?
+enabled = false
 
 [kafka]
 topic = "mytopic"
@@ -84,8 +87,26 @@ rootca = "cert/KafkaCA.cert"
 cert = "cert/KafkaConsumerCA.cert"
 key = "cert/KafkaConsumerPrivateKey.key"
 brokers = ["1.1.1.1:9093"]
+
+[twilio]
+# Do we want to send SMS or not?
+enabled = false
+# Token from Twilio
+token = ""
+# SID from Twilio
+sid = ""
+# Phone number, international format with no space, for example +123456789
+to = ""
+# Maximum messages per minute
+limit = 1
 ```
 
 This will configure a basic setup to integrate go-home with Tetration. From there you need to:
 * Configure a Forensics Alert - [doc](documentation/forensics.md)
 * Configure an Isolation Rule - [doc](documentation/isolation.md)
+
+## Run
+```
+go build
+./go-home -logtostderr=true -v1
+```
