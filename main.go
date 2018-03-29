@@ -10,9 +10,8 @@ import (
 	"strings"
 
 	"github.com/Shopify/sarama"
-	"github.com/golang/glog"
-
 	"github.com/davecgh/go-spew/spew"
+	"github.com/golang/glog"
 )
 
 // KafkaConfig Kafka configuration struct
@@ -139,13 +138,8 @@ func consumerLoop(cons sarama.Consumer, topic string, part int32, h *Tetration, 
 				// If Tetration is defined, we shall Isolate
 				if h != nil {
 					glog.V(2).Infof("Tetration is enabled, isolation started\n")
-					// Alert will return a sensor name and not IP, we need to get the IPs from inventory
-					// a host could have multiple IPs
-					ips := h.getSensorIP(alert.AlertDetail.SensorID)
-					for _, v := range ips {
-						// Isolate VMs by assigning tags to IP (quarantine=isolate)
-						h.Isolate(v["ip"], v["scope"])
-					}
+					// Send a message to our go routine to isolate a host
+					h.Isolate <- &Endpoint{SensorID: alert.AlertDetail.SensorID}
 				} else {
 					glog.V(2).Infof("Tetration is not enabled, no isolation\n")
 				}

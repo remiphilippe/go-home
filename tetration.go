@@ -1,39 +1,25 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
-	"log"
+	"time"
 
 	"github.com/golang/glog"
 	goh4 "github.com/remiphilippe/go-h4"
 )
 
-// This file is temporary, most of the structs will move to go-h4
-
-type Annotation struct {
-	IP         string            `json:"ip"`
-	Attributes map[string]string `json:"attributes"`
+// Endpoint This struct just holds a sensorid, it's used for isolation
+type Endpoint struct {
+	SensorID string
 }
 
-type Filter struct {
-	Type    string              `json:"type"`
-	Filters []map[string]string `json:"filters"`
-}
-
-type Search struct {
-	Filter *Filter `json:"filter"`
-	Scope  string  `json:"scopeName,omitempty"`
-	Limit  int     `json:"limit"`
-	Offset int     `json:"offset,omitempty"`
-}
-
+// Tetration Struct that holds our Tetration object
 type Tetration struct {
-	h4 *goh4.H4
+	h4      *goh4.H4
+	Isolate chan *Endpoint
 }
 
+// NewTetration Factory to initialize the Tetration object
 func NewTetration(config *Config) *Tetration {
-
 	h := new(Tetration)
 
 	h.h4 = new(goh4.H4)
@@ -43,88 +29,58 @@ func NewTetration(config *Config) *Tetration {
 	h.h4.Verify = config.APIVerify
 	h.h4.Prefix = "/openapi/v1"
 
+	// The channel is to create a queue and avoid running too many parallel threads
+	h.Isolate = make(chan *Endpoint)
+	go h.listener()
+
 	return h
+}
+
+func (h *Tetration) listener() {
+	for {
+		select {
+		case msg := <-h.Isolate:
+			// Alert will return a sensor name and not IP, we need to get the IPs from inventory
+			ips := h.getSensorIP(msg.SensorID)
+			// a host could have multiple IPs
+			for _, v := range ips {
+				// Isolate VMs by assigning tags to IP (quarantine=isolate)
+				h.isolate(v["ip"], v["scope"])
+
+				// Slow down a bit the requests, kafka can send a lot of messages
+				time.Sleep(100 * time.Millisecond)
+			}
+		}
+	}
 }
 
 func (h *Tetration) getSensorIP(hostUUID string) []map[string]string {
 	// More info - https://<some tetration cluster>/documentation/ui/openapi/api_inventory.html#inventory-search
 	// first we need to build a filter
-	f0 := make(map[string]string)
-	f0["type"] = "contains"
-	f0["field"] = "host_uuid"
-	f0["value"] = hostUUID
+	f0 := goh4.Filter{}
+	f0.Type = "contains"
+	f0.Field = "host_uuid"
+	f0.Value = hostUUID
 
-	// add our filter elements to a set of filters with an operation (and / or)
-	filter := &Filter{
-		Type:    "and",
-		Filters: []map[string]string{f0},
+	q := goh4.InventoryQuery{
+		Limit: 100,
+		Filter: &goh4.QueryFilter{
+			Type:    "and",
+			Filters: []interface{}{&f0},
+		},
 	}
-
-	// Add our filter to the search query
-	search := Search{
-		Limit:  100,
-		Filter: filter,
-	}
-	jsonStr, err := json.Marshal(&search)
+	s, err := h.h4.InventorySearch(&q)
 	if err != nil {
-		glog.Errorf("Error Marshalling search %s", err)
-	}
-	postResp := h.h4.Post("/inventory/search", fmt.Sprintf("%s", jsonStr))
-
-	/*
-	   (map[string]interface {}) (len=1) {
-	    (string) (len=7) "results": ([]interface {}) (len=1 cap=1) {
-	     (map[string]interface {}) (len=24) {
-	      (string) (len=10) "os_version": (string) (len=3) "7.4",
-	      (string) (len=15) "tags_scope_name": ([]interface {}) (len=4 cap=4) {
-	       (string) (len=7) "Default",
-	       (string) (len=13) "Default:SJC15",
-	       (string) (len=25) "Default:SJC15:Attack Demo",
-	       (string) (len=32) "Default:SJC15:Lab Infrastructure"
-	      },
-	      (string) (len=9) "user_role": (interface {}) <nil>,
-	      (string) (len=8) "user_vpc": (string) (len=7) "esx-dmz",
-	      (string) (len=12) "address_type": (string) (len=4) "IPV4",
-	      (string) (len=2) "os": (string) (len=6) "CentOS",
-	      (string) (len=12) "user_TA_zeus": (interface {}) <nil>,
-	      (string) (len=19) "user_classification": (string) (len=6) "public",
-	      (string) (len=2) "ip": (string) (len=12) "172.20.0.190",
-	      (string) (len=7) "netmask": (string) (len=13) "255.255.255.0",
-	      (string) (len=16) "tags_is_internal": (string) (len=4) "true",
-	      (string) (len=8) "user_app": (interface {}) <nil>,
-	      (string) (len=13) "user_location": (string) (len=5) "sjc15",
-	      (string) (len=10) "user_scope": (interface {}) <nil>,
-	      (string) (len=6) "vrf_id": (string) (len=1) "1",
-	      (string) (len=9) "host_name": (string) (len=16) "centos7-rephilip",
-	      (string) (len=9) "iface_mac": (string) (len=17) "00:50:56:8f:1c:92",
-	      (string) (len=13) "user_TA_cymru": (interface {}) <nil>,
-	      (string) (len=14) "user_lifecycle": (interface {}) <nil>,
-	      (string) (len=11) "user_public": (interface {}) <nil>,
-	      (string) (len=8) "uuid_src": (string) (len=6) "SENSOR",
-	      (string) (len=8) "vrf_name": (string) (len=7) "Default",
-	      (string) (len=9) "host_uuid": (string) (len=40) "39640178054cca9f98539e5ea17ecf99b005b971",
-	      (string) (len=10) "iface_name": (string) (len=6) "ens192"
-	     }
-	    }
-	   }
-
-	*/
-
-	jsonResp := make(map[string]interface{})
-	err = json.Unmarshal(postResp, &jsonResp)
-	if err != nil {
-		glog.Errorf("Error unmarshalling json %s", err)
+		glog.Errorf("Inventory Search Error: %s", err.Error())
 	}
 
 	var entry map[string]string
 	var res []map[string]string
 
-	for _, v := range jsonResp["results"].([]interface{}) {
-		e := v.(map[string]interface{})
-		glog.V(2).Infof("Search found %s in scope %s for UUID %s\n", e["ip"].(string), e["vrf_name"].(string), hostUUID)
+	for _, v := range s {
 		entry = make(map[string]string)
-		entry["scope"] = e["vrf_name"].(string)
-		entry["ip"] = e["ip"].(string)
+		entry["scope"] = v.Scopes[0]
+		entry["ip"] = v.IP.String()
 		res = append(res, entry)
 	}
 
@@ -132,22 +88,24 @@ func (h *Tetration) getSensorIP(hostUUID string) []map[string]string {
 }
 
 // Isolate set an isolation tag on a VM, this tag needs to be attached to a policy
-func (h *Tetration) Isolate(ip string, scope string) error {
+func (h *Tetration) isolate(ip string, scope string) error {
 	// Create a map of attributes to apply to a workload
 	attributes := make(map[string]string)
 	attributes["quarantine"] = "isolate"
 
 	// Define where we want to attach this annotation
-	annotation := Annotation{
+	annotation := goh4.Annotation{
 		IP:         ip,
 		Attributes: attributes,
+		Scope:      scope,
 	}
-	jsonStr, err := json.Marshal(&annotation)
-	if err != nil {
-		log.Fatal(err)
-	}
+
 	glog.V(1).Infof("Isolating Host %s in scope %s\n", ip, scope)
-	h.h4.Post(fmt.Sprintf("/inventory/tags/%s", scope), fmt.Sprintf("%s", jsonStr))
+	err := h.h4.AddAnnotation(&annotation)
+	if err != nil {
+		glog.Errorf("Error in Annotation: %s", err.Error())
+		return err
+	}
 
 	return nil
 }
